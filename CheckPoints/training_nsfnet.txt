@@ -1,0 +1,22 @@
+I0322 07:52:06.547446  2952 training.py:527] Skip the current checkpoint eval due to throttle secs (600 secs).
+I0322 07:52:06.812680  2952 estimator.py:1145] Calling model_fn.
+I0322 07:52:08.271677  2952 estimator.py:1147] Done calling model_fn.
+I0322 07:52:08.285645  2952 evaluation.py:255] Starting evaluation at 2024-03-22T07:52:08Z
+I0322 07:52:08.357680  2952 monitored_session.py:240] Graph was finalized.
+I0322 07:52:08.363717  2952 saver.py:1280] Restoring parameters from ./CheckPoints/nsfnetbw\model.ckpt-50000
+I0322 07:52:08.510963  2952 session_manager.py:500] Running local_init_op.
+I0322 07:52:08.561967  2952 session_manager.py:502] Done running local_init_op.
+I0322 07:52:12.121086  2952 evaluation.py:167] Evaluation [10/100]
+I0322 07:52:14.762717  2952 evaluation.py:167] Evaluation [20/100]
+I0322 07:52:17.415155  2952 evaluation.py:167] Evaluation [30/100]
+I0322 07:52:20.041940  2952 evaluation.py:167] Evaluation [40/100]
+I0322 07:52:22.678383  2952 evaluation.py:167] Evaluation [50/100]
+I0322 07:52:25.321884  2952 evaluation.py:167] Evaluation [60/100]
+I0322 07:52:27.943354  2952 evaluation.py:167] Evaluation [70/100]
+I0322 07:52:30.587939  2952 evaluation.py:167] Evaluation [80/100]
+I0322 07:52:33.218669  2952 evaluation.py:167] Evaluation [90/100]
+I0322 07:52:35.854198  2952 evaluation.py:167] Evaluation [100/100]
+I0322 07:52:35.924623  2952 evaluation.py:275] Finished evaluation at 2024-03-22-07:52:35
+I0322 07:52:35.925348  2952 estimator.py:2039] Saving dict for global step 50000: global_step = 50000, label/mean = 0.043264534, loss = 0.0033852854, mae = 0.029356327, mre = -0.0041465904, prediction/mean = 0.053441375, rho = 0.9978271
+I0322 07:52:35.978884  2952 estimator.py:2099] Saving 'checkpoint_path' summary for global step 50000: ./CheckPoints/nsfnetbw\model.ckpt-50000
+I0322 07:52:36.127142  2952 estimator.py:368] Loss for final step: 0.0119785555.
