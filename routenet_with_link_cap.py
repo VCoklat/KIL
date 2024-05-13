@@ -102,7 +102,6 @@ def cummax(alist, extractor):
 
     return cummaxes
 
-
 def transformation_func(it, batch_size=32):
     with tf.name_scope("transformation_func"):
         vs = [it.get_next() for _ in range(batch_size)]
