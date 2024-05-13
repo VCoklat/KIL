@@ -61,7 +61,6 @@ def _int64_features(value):
 def _float_features(value):
     return tf.train.Feature(float_list=tf.train.FloatList(value=value))
 
-
 def parse(serialized, target='delay'):
     '''
     Target is the name of predicted variable
@@ -145,13 +144,31 @@ def tfrecord_input_fn(filenames,hparams,shuffle_buf=1000,target='delay'):
     return sample
 
 class ComnetModel(tf.keras.Model):
-    def __init__(self,hparams, output_units=1, final_activation=None):
+    """
+    ComnetModel is a custom Keras model for the Comnet network.
+
+    Args:
+        hparams: Hyperparameters for the model.
+        output_units: Number of output units.
+        final_activation: Activation function for the final layer.
+
+    Attributes:
+        edge_update: GRUCell layer for updating edge states.
+        path_update: GRUCell layer for updating path states.
+        readout: Sequential model for the readout layer.
+
+    Methods:
+        build: Builds the model.
+        call: Performs the forward pass of the model.
+
+    """
+
+    def __init__(self, hparams, output_units=1, final_activation=None):
         super(ComnetModel, self).__init__()
         self.hparams = hparams
 
         self.edge_update = tf.keras.layers.GRUCell(hparams.link_state_dim)
         self.path_update = tf.keras.layers.GRUCell(hparams.path_state_dim)
-
 
         self.readout = tf.keras.models.Sequential()
 
@@ -166,60 +183,76 @@ class ComnetModel(tf.keras.Model):
 
         self.readout.add(keras.layers.Dense(output_units,
                 kernel_regularizer=tf.contrib.layers.l2_regularizer(hparams.l2_2),
-                activation = final_activation ) )
-
+                activation=final_activation))
 
     def build(self, input_shape=None):
+        """
+        Builds the model.
+
+        Args:
+            input_shape: Shape of the input tensor.
+
+        """
         del input_shape
-        self.edge_update.build(tf.TensorShape([None,self.hparams.path_state_dim]))
-        self.path_update.build(tf.TensorShape([None,self.hparams.link_state_dim]))
-        self.readout.build(input_shape = [None,self.hparams.path_state_dim])
+        self.edge_update.build(tf.TensorShape([None, self.hparams.path_state_dim]))
+        self.path_update.build(tf.TensorShape([None, self.hparams.link_state_dim]))
+        self.readout.build(input_shape=[None, self.hparams.path_state_dim])
         self.built = True
 
-
     def call(self, inputs, training=False):
+        """
+        Performs the forward pass of the model.
+
+        Args:
+            inputs: Input tensor.
+            training: Whether the model is in training mode or not.
+
+        Returns:
+            Output tensor.
+
+        """
         f_ = inputs
-        shape = tf.stack([f_['n_links'], self.hparams.link_state_dim-1], axis=0)
+        shape = tf.stack([f_['n_links'], self.hparams.link_state_dim - 1], axis=0)
         link_state = tf.concat([
             tf.expand_dims(f_['link_capacity'], axis=1),
             tf.zeros(shape)
         ], axis=1)
-        shape = tf.stack([f_['n_paths'],self.hparams.path_state_dim-1], axis=0)
+        shape = tf.stack([f_['n_paths'], self.hparams.path_state_dim - 1], axis=0)
         path_state = tf.concat([
-            tf.expand_dims(f_['traffic'][0:f_["n_paths"]],axis=1),
+            tf.expand_dims(f_['traffic'][0:f_["n_paths"]], axis=1),
             tf.zeros(shape)
         ], axis=1)
 
         links = f_['links']
         paths = f_['paths']
-        seqs=  f_['sequences']
+        seqs = f_['sequences']
 
         for _ in range(self.hparams.T):
 
-            h_tild = tf.gather(link_state,links)
+            h_tild = tf.gather(link_state, links)
 
-            ids=tf.stack([paths, seqs], axis=1)
-            max_len = tf.reduce_max(seqs)+1
+            ids = tf.stack([paths, seqs], axis=1)
+            max_len = tf.reduce_max(seqs) + 1
             shape = tf.stack([f_['n_paths'], max_len, self.hparams.link_state_dim])
             lens = tf.math.segment_sum(data=tf.ones_like(paths),
-                                    segment_ids=paths)
+                                       segment_ids=paths)
 
             link_inputs = tf.scatter_nd(ids, h_tild, shape)
             outputs, path_state = tf.nn.dynamic_rnn(self.path_update,
                                                     link_inputs,
                                                     sequence_length=lens,
-                                                    initial_state = path_state,
+                                                    initial_state=path_state,
                                                     dtype=tf.float32)
-            m = tf.gather_nd(outputs,ids)
-            m = tf.math.unsorted_segment_sum(m, links ,f_['n_links'])
+            m = tf.gather_nd(outputs, ids)
+            m = tf.math.unsorted_segment_sum(m, links, f_['n_links'])
 
-            #Keras cell expects a list
-            link_state,_ = self.edge_update(m, [link_state])
+            # Keras cell expects a list
+            link_state, _ = self.edge_update(m, [link_state])
 
         if self.hparams.learn_embedding:
-            r = self.readout(path_state,training=training)
+            r = self.readout(path_state, training=training)
         else:
-            r = self.readout(tf.stop_gradient(path_state),training=training)
+            r = self.readout(tf.stop_gradient(path_state), training=training)
 
         return r
 
