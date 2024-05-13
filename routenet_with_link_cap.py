@@ -441,15 +441,14 @@ def ned2lists(fname):
                 channels.append(auxList)
                 link_cap[(m.groups()[0])+':'+str(m.groups()[3])] = int(m.groups()[2])
 
-    n=max(map(max, channels))+1
-    connections = [{} for i in range(n)]
+    connections = [{} for _ in range(n)]
     # Shape of connections[node][port] = node connected to
     for c in channels:
         connections[c[0]][c[1]]=c[2]
         connections[c[2]][c[3]]=c[0]
     # Connections store an array of nodes where each node position correspond to
     # another array of nodes that are connected to the current node
-    connections = [[v for k,v in sorted(con.items())]
+    connections = [[v for _,v in sorted(con.items())]
                    for con in connections ]
     return connections,n, link_cap
 
