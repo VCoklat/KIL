@@ -349,12 +349,24 @@ def tfrecord_input_fn(filenames,hparams,shuffle_buf=1000, target='delay'):
     
     return sample
 
-
+from agent import Agent
 
 class ComnetModel(tf.keras.Model):
     def __init__(self,hparams, output_units=1):
         super(ComnetModel, self).__init__()
         self.hparams = hparams
+        self.environment = environment
+        self.agent = Agent(self.environment)  # Create an instance of Agent
+        
+        self.num_states = environment.state_space_size
+        self.num_actions = environment.action_space_size
+        self.epsilon = 1.0  # Initial exploration rate
+        self.min_epsilon = 0.01  # Minimum exploration rate
+        self.epsilon_decay = 0.995  # Decay rate for epsilon
+        self.learning_rate = 0.01  # Learning rate for Q-learning
+        self.discount_factor = 0.99  # Discount factor for Q-learning
+        self.state = 0  # Initial state
+        
 
         self.edge_update = tf.nn.rnn_cell.GRUCell(hparams.link_state_dim, dtype=tf.float32)
         self.path_update = tf.nn.rnn_cell.GRUCell(hparams.path_state_dim, dtype=tf.float32)
@@ -376,7 +388,18 @@ class ComnetModel(tf.keras.Model):
         self.readout.add(keras.layers.Dropout(rate=hparams.dropout_rate))
 
         self.readout.add(keras.layers.Dense(output_units, kernel_regularizer=tf.contrib.layers.l2_regularizer(hparams.l2_2)))
+        # Initialize the Q-table
+        self.q_table = np.zeros((num_states, num_actions))
 
+    def reward_function(predicted_delays, actual_delays):
+        # Calculate the absolute difference between the predicted and actual delays
+        difference = tf.abs(predicted_delays - actual_delays)
+
+        # Calculate the reward as the negative difference
+        # This means that the reward is higher for smaller differences
+        reward = -difference
+
+        return reward
             
     def build(self, input_shape=None):
         del input_shape
@@ -386,6 +409,13 @@ class ComnetModel(tf.keras.Model):
         self.readout.build(input_shape = [None,self.hparams.path_state_dim])
         self.built = True
     
+    def train(self, num_episodes):
+        for episode in range(num_episodes):
+            done = False
+            while not done:
+                new_state, reward, _ = self.call(self.environment.state)
+                done = self.environment.is_done()
+
     def call(self, inputs, training=False):
         f_ = inputs
         shape = tf.stack([f_['n_links'],self.hparams.link_state_dim], axis=0)
@@ -430,8 +460,28 @@ class ComnetModel(tf.keras.Model):
         # Thsi forces additive model for delay
         #r = tf.gather(r,links)
         #r = tf.segment_sum(r,segment_ids=paths)
-        return r
-    
+        #return r
+
+        # Use the Agent class to select an action
+        action = self.agent.select_action(self.state, self.q_table, self.epsilon)
+
+        # Take a step in the environment
+        new_state, reward, done = self.environment.step(action)
+
+        # Calculate the reward using the reward function
+        predicted_delays = self.readout(path_state, training=training)
+        reward = self.reward_function(predicted_delays, new_state)
+
+        # Update the Q-table
+        self.q_table[self.state, action] = (1 - self.learning_rate) * self.q_table[self.state, action] + self.learning_rate * (reward + self.discount_factor * np.max(self.q_table[new_state]))
+
+        # Update the state
+        self.state = new_state
+
+        # Decay epsilon
+        self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
+
+        return new_state, reward, r
 
 
 def model_fn(
